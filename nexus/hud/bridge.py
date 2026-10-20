@@ -184,6 +184,14 @@ class Api:
     def test_voice(self, chip: str, voice: str) -> dict:
         return self._call(self._core.test_voice, chip, voice)
 
+    def dev(self, cmd: str) -> dict:
+        """Geliştirici kısayolları; yalnızca --debug ile çalışır."""
+        if not getattr(self._core, "debug", False):
+            return {"ok": False, "error": "debug kapalı"}
+        if cmd == "story_due":
+            return self._call(self._core.force_story_due)
+        return {"ok": False, "error": f"bilinmeyen komut: {cmd}"}
+
     def open_data_folder(self) -> dict:
         try:
             path = str(paths.DATA_DIR)
