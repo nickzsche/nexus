@@ -53,7 +53,10 @@ def make_ctx():
 def clean_state():
     """Her testten önce veri klasörü boşaltılır, çalışma zamanı durumu sıfırlanır."""
     for entry in paths.DATA_DIR.iterdir():
-        shutil.rmtree(entry) if entry.is_dir() else entry.unlink()
+        try:
+            shutil.rmtree(entry) if entry.is_dir() else entry.unlink()
+        except FileNotFoundError:                 # arka plan iş parçacığı aynı anda siliyor olabilir
+            pass
     system.clear_timers()
     system.set_timer_callback(None)
     rivalry.reset_runtime()

@@ -75,6 +75,7 @@ class Core:
         self._mic_level = 0.0
         self._timer_totals: dict[int, float] = {}
         self._stop = threading.Event()
+        self._tele_thread: threading.Thread | None = None
         self._net = psutil.net_io_counters()
         self._net_t = time.monotonic()
 
@@ -86,7 +87,8 @@ class Core:
         self._thread.start()
         self.speaker.start()
         system_tools.set_timer_callback(self._on_timer_done)
-        threading.Thread(target=self._telemetry_loop, daemon=True, name="nexus-telemetry").start()
+        self._tele_thread = threading.Thread(target=self._telemetry_loop, daemon=True, name="nexus-telemetry")
+        self._tele_thread.start()
         self._submit(self._mount(self.active, announce=False))
 
     def _run_loop(self) -> None:
@@ -104,7 +106,12 @@ class Core:
             pass
         system_tools.clear_timers()
         self.speaker.close()
-        self.loop.call_soon_threadsafe(self.loop.stop)
+        if self._thread:
+            self.loop.call_soon_threadsafe(self.loop.stop)
+            self._thread.join(3)                          # bekleyen görevler (ayar yazımı vb.) bitsin
+            self._thread = None
+        if self._tele_thread:
+            self._tele_thread.join(2)
 
     def set_emitter(self, fn: Emitter) -> None:
         self._emitter = fn
