@@ -24,7 +24,7 @@ DEFAULTS: dict[str, Any] = {
     "fx_intensity": {},           # çip → 0.0–1.5
     "workspace": "",
     "shell_confirm": True,
-    "live_models": ["gemini-3.8-live", "gemini-2.5-flash-native-audio-latest"],
+    "live_models": ["gemini-2.5-flash-native-audio-latest"],     # kullanıcının seçtiği model: Gemini 2.5 Flash Live
     "text_model": "gemini-flash-latest",
     "tts_models": ["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts"],
     "last_chip": "atlas",

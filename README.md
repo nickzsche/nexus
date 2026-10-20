@@ -85,8 +85,7 @@ python run.py --demo --debug             # anahtarsız deneme + DevTools
 
 * Kulaklıksız kullanımda yankıyı `barge_rms` eşiği bastırır; yetmezse ileride WebRTC AEC eklenecek.
 * Araya girme ve arena ek metin + TTS çağrısı demektir (*sakin* seviyede hiç çağrı yapılmaz); 1–2 sn gecikebilir.
-* `gemini-3.8-live` bazı hesaplarda kota nedeniyle reddedilir; NEXUS otomatik olarak
-  `gemini-2.5-flash-native-audio-latest`'e geçer.
+* Konuşma modeli `gemini-2.5-flash-native-audio-latest` (Gemini 2.5 Flash Live). Başka model denemek için Ayarlar › Gelişmiş.
 * Windows'a özel araçlar (Defender, güvenlik duvarı, pencere listesi, medya tuşları) bu repoda Windows
   üzerinde elle doğrulanmalıdır (bkz. `SPEC` §10 manuel kabul testi).
 * Yazı tipleri (Rajdhani, Inter, JetBrains Mono) OFL lisanslıdır, bkz. `licenses/`.

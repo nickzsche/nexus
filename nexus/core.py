@@ -16,6 +16,7 @@ import psutil
 
 from . import VERSION, chips, memory, rivalry, settings, story, voicefx
 from .audio import io as aio
+from .audio.gate import MicGate
 from .brain.aux import Aux, AuxError, voice_for
 from .brain.fake import FakeBrain
 from .brain.live import LiveSession
@@ -74,6 +75,8 @@ class Core:
         self._last_ai = ""
         self._sent: dict[str, str] = {}              # açık HUD satırına şimdiye dek gönderilen metin
         self._mic_level = 0.0
+        self.gate = MicGate()
+        self._t_user_end: float | None = None        # kullanıcının sözü bitti (gecikme ölçümü için)
         self._timer_totals: dict[int, float] = {}
         self._stop = threading.Event()
         self._tele_thread: threading.Thread | None = None
@@ -234,6 +237,7 @@ class Core:
             self._submit(self._send_text(text))
 
     async def _send_text(self, text: str) -> None:
+        self._t_user_end = time.monotonic()
         self.speaker.clear()
         self._on_line("user", text, True)
         if self.brain:
@@ -262,10 +266,21 @@ class Core:
     def _on_mic(self, pcm: bytes, rms: float) -> None:            # sounddevice iş parçacığı
         self._mic_level = rms
         if self._interjecting or self._arena or self.brain is None:
+            self.gate.reset()
             return
-        # Hoparlör çalarken yalnızca barge_rms'yi aşan ses gerçek konuşma sayılır; yoksa sessizlik gider (yankı).
-        data = b"\x00" * len(pcm) if (self.speaker.busy and rms < float(settings.get("barge_rms"))) else pcm
-        self.loop.call_soon_threadsafe(self.brain.send_audio, data)
+        actions = self.gate.feed(pcm, rms, self.speaker.busy, float(settings.get("barge_rms")))
+        if actions:
+            self.loop.call_soon_threadsafe(self._mic_actions, actions)
+
+    def _mic_actions(self, actions: list) -> None:                # döngü iş parçacığı
+        if self.brain is None:
+            return
+        for a in actions:
+            if a[0] == "audio":
+                self.brain.send_audio(a[1])
+            else:                                                 # ("end",): konuşma bitti, Gemini'ye hemen bildir
+                self._t_user_end = time.monotonic()
+                self.brain.send_audio_end()
 
     # ------------------------------------------------------------------ beyin geri çağrıları (döngü iş parçacığı)
     def _on_brain_status(self, s: str) -> None:
@@ -297,6 +312,10 @@ class Core:
             return                                                  # arena/araya girme sırasında Live sesi çalınmaz
         if not self._turn_audio:
             self._turn_audio = True
+            if self._t_user_end is not None:
+                log(f"gecikme: söz bitti → ilk ses {(time.monotonic() - self._t_user_end) * 1000:.0f} ms")
+                self.emit("latency", {"ms": round((time.monotonic() - self._t_user_end) * 1000)})
+                self._t_user_end = None
             self._chain.reset()
             intro = self._chain.intro()
             if intro:

@@ -45,6 +45,9 @@ class FakeBrain:
     def send_audio(self, pcm: bytes) -> None:       # demoda ses yok
         pass
 
+    def send_audio_end(self) -> None:
+        pass
+
     def send_image(self, jpeg: bytes, note: str = "") -> None:
         self.send_text(note or "Görüntüyü aldım (demo).")
 

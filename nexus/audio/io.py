@@ -78,7 +78,7 @@ class Speaker:
             try:
                 import sounddevice as sd
                 self._stream = sd.RawOutputStream(samplerate=OUT_RATE, channels=1, dtype="int16", blocksize=480,
-                                                  device=self._device, callback=self._callback)
+                                                  device=self._device, latency="low", callback=self._callback)
                 self._stream.start()
                 return
             except Exception as exc:
@@ -169,7 +169,7 @@ class Speaker:
 class Microphone:
     """16 kHz mono mikrofon; her parça için on_chunk(pcm_bytes, rms) çağrılır (rms 0–1)."""
 
-    def __init__(self, on_chunk: Callable[[bytes, float], None], device: int | None = None, blocksize: int = 640) -> None:
+    def __init__(self, on_chunk: Callable[[bytes, float], None], device: int | None = None, blocksize: int = 320) -> None:
         self._cb, self._device, self._block = on_chunk, device, blocksize
         self._stream = None
         self.active = False
@@ -180,7 +180,7 @@ class Microphone:
         try:
             import sounddevice as sd
             self._stream = sd.RawInputStream(samplerate=IN_RATE, channels=1, dtype="int16", blocksize=self._block,
-                                             device=self._device, callback=self._callback)
+                                             device=self._device, latency="low", callback=self._callback)
             self._stream.start()
             self.active = True
             return True

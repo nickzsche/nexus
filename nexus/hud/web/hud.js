@@ -471,7 +471,7 @@ const MOCK = (() => {
   const matrix = () => Object.fromEntries(ORDER.map(a => [a, Object.fromEntries(ORDER.map(b => [b, a === b ? 100 : score(a, b)]))]));
   const events = [{ a:'sentinel', b:'forge', delta:-2, reason:'SENTINEL araya girdi: "deploy mu dedin?"' }, { a:'forge', b:'atlas', delta:1, reason:'FORGE ATLAS\'a bilgi aktardı' }];
   const settings = { user_name:'', drama:'normal', story_enabled:true, mic_enabled:true, input_device:null, output_device:null, barge_rms:.06, voice_overrides:{}, fx_intensity:{}, workspace:'', shell_confirm:true,
-    live_models:['gemini-3.8-live', 'gemini-2.5-flash-native-audio-latest'], text_model:'gemini-flash-latest', tts_models:['gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts'], onboarded:false };
+    live_models:['gemini-2.5-flash-native-audio-latest'], text_model:'gemini-flash-latest', tts_models:['gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts'], onboarded:false };
   const st = { active:'atlas', mic:false, story:{ locked:false, chained:[] }, code:'KARA-1234-ZNCR', timers:[], hasKey:!/onboard=1/.test(location.search), speaking:false };
   const emit = (e, p) => setTimeout(() => NX.on(e, p), 0), later = (ms, f) => setTimeout(f, ms);
   const say = (who, kind, text, done) => { const words = text.split(' '); let i = 0; emit('status', { status:'speaking', chip:who }); (function nx() { if (i < words.length) { emit('line', { who, kind, text:(i ? ' ' : '') + words[i++], final:false }); later(110, nx); } else { emit('line', { who, kind, text:'', final:true }); done && done(); } })(); };
@@ -479,7 +479,7 @@ const MOCK = (() => {
   setInterval(() => { if (real()) return; const w = (v, a, b, s) => clamp(v + (Math.random() - .5) * s, a, b); tele = { cpu:w(tele.cpu, 3, 97, 14), ram:w(tele.ram, 30, 90, 3), disk:w(tele.disk, 50, 80, .4), nd:w(tele.nd, 0, 900, 120), nu:w(tele.nu, 0, 300, 50) };
     const talking = st.speaking; NX.on('telemetry', { cpu:tele.cpu, ram:tele.ram, disk:tele.disk, net_down:tele.nd, net_up:tele.nu, mic:st.mic ? .02 + Math.random() * .12 : .004, spk:talking ? .2 + Math.random() * .6 : 0, speaker:talking ? st.active : null }); }, 1000);
   const api = {
-    state() { return { roster, active:st.active, matrix:matrix(), events, story:st.story, settings:{ ...settings }, has_key:st.hasKey, model:'gemini-3.8-live', version:'1.0.0',
+    state() { return { roster, active:st.active, matrix:matrix(), events, story:st.story, settings:{ ...settings }, has_key:st.hasKey, model:'gemini-2.5-flash-native-audio-latest', version:'1.0.0',
       timers:st.timers, ledger:{ net30:-4280.5, income30:32000, expense30:36280.5, count:47 } }; },
     settings_get() { return { ...settings }; },
     settings_set(k, v) { settings[k] = v; return { ok:true, settings:{ ...settings } }; },

@@ -80,6 +80,10 @@ class LiveSession:
     def send_audio(self, pcm: bytes) -> None:
         self._put(("audio", pcm))
 
+    def send_audio_end(self) -> None:
+        """Konuşma bitti: Gemini olağan ~800 ms sessizlik beklemesini atlayıp hemen cevaplar."""
+        self._put(("audio_end",))
+
     def send_text(self, text: str) -> None:
         self._put(("text", text))
 
@@ -128,6 +132,10 @@ class LiveSession:
             output_audio_transcription={},
             context_window_compression=types.ContextWindowCompressionConfig(sliding_window=types.SlidingWindow()),
             session_resumption=types.SessionResumptionConfig(handle=self.handle),
+            # Bitişi mikrofon kapısı bildirir (audio_stream_end); sunucu VAD'i yalnızca yedek ve gürültüye az duyarlı.
+            realtime_input_config=types.RealtimeInputConfig(
+                automatic_activity_detection=types.AutomaticActivityDetection(
+                    start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_LOW, silence_duration_ms=500)),
         )
 
     def _connector(self, model: str, config: Any):
@@ -185,7 +193,9 @@ class LiveSession:
             item = await self._out.get()
             kind = item[0]
             try:
-                if kind == "audio":
+                if kind == "audio_end":
+                    await session.send_realtime_input(audio_stream_end=True)
+                elif kind == "audio":
                     await session.send_realtime_input(audio=types.Blob(data=item[1], mime_type="audio/pcm;rate=16000"))
                 elif kind == "text":
                     try:
