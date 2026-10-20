@@ -153,3 +153,50 @@ def test_interrupt_closes_open_ai_line(core):
     core._on_line("ai", "Tamam", True)
     got = [(p["text"], p["final"]) for e, p in core.events if e == "line"]
     assert got == [("Başlıyorum", False), ("", True), ("Tamam", False), ("", True)]
+
+
+def test_slow_interjection_never_blocks_live_audio_or_mic(core):
+    """Hata: araya girme metni takılınca (30 sn) Live sesi atılıyor ve mikrofon kesiliyordu → hiç ses gelmiyordu."""
+    import asyncio
+    until(lambda: any(e == "chip" for e, _ in core.events))
+    core._chain = __import__("nexus.voicefx", fromlist=["x"]).for_profile("none")
+
+    async def very_slow(*a, **k):
+        await asyncio.sleep(30)
+
+    core.aux.interject_text = very_slow
+    settings.set("drama", "kaos")
+    core._last_user = "deploy ettim"
+    rivalry.reset_runtime()
+    core.loop.call_soon_threadsafe(core._maybe_interject)
+    time.sleep(.3)                                              # araya girme üretimde bekliyor
+    assert core._interjecting is False
+    fed = []
+    orig = core.speaker.feed
+    core.speaker.feed = lambda who, pcm: (fed.append(len(pcm)), orig(who, pcm))[1]
+    core._on_audio(b"\x10\x00" * 480)                           # Live cevabı: çalınmalı
+    assert fed, "araya girme beklerken Live sesi atıldı"
+    core.set_mic(False)
+    assert core.gate is not None
+
+
+def test_interjection_is_dropped_when_user_starts_speaking(core):
+    import asyncio
+    until(lambda: any(e == "chip" for e, _ in core.events))
+    called = []
+
+    async def text(*a, **k):
+        await asyncio.sleep(.3)
+        return "Deploy mu dedin?"
+
+    async def tts(*a, **k):
+        called.append("tts")
+        return b"\x00\x00" * 2400
+
+    core.aux.interject_text, core.aux.tts = text, tts
+    core._last_user = "deploy"
+    fut = asyncio.run_coroutine_threadsafe(core._interject("sentinel", "atlas", "deploy", "tamam"), core.loop)
+    time.sleep(.1)
+    core._turn_seq += 1                                         # kullanıcı konuşmaya başladı
+    fut.result(3)
+    assert called == [] and not any(p.get("kind") == "interject" for e, p in core.events if e == "line")

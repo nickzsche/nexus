@@ -26,6 +26,8 @@ from .tools import misc as misc_tools
 from .tools import system as system_tools
 
 Emitter = Callable[[str, dict], None]
+INTERJECT_TEXT_TIMEOUT = 8.0                       # araya girme metni için üst sınır (yoğun modelde takılmasın)
+INTERJECT_TTS_TIMEOUT = 10.0
 
 
 class _Ctx:
@@ -76,6 +78,8 @@ class Core:
         self._sent: dict[str, str] = {}              # açık HUD satırına şimdiye dek gönderilen metin
         self._mic_level = 0.0
         self.gate = MicGate()
+        self._turn_seq = 0                            # kullanıcı yeni bir söze başladıkça artar (araya girmeyi iptal eder)
+        self._user_speaking = False
         self._t_user_end: float | None = None        # kullanıcının sözü bitti (gecikme ölçümü için)
         self._timer_totals: dict[int, float] = {}
         self._stop = threading.Event()
@@ -237,6 +241,7 @@ class Core:
             self._submit(self._send_text(text))
 
     async def _send_text(self, text: str) -> None:
+        self._turn_seq += 1
         self._t_user_end = time.monotonic()
         self.speaker.clear()
         self._on_line("user", text, True)
@@ -277,8 +282,12 @@ class Core:
             return
         for a in actions:
             if a[0] == "audio":
+                if not self._user_speaking:
+                    self._user_speaking = True
+                    self._turn_seq += 1                               # kullanıcı konuşmaya başladı
                 self.brain.send_audio(a[1])
-            else:                                                 # ("end",): konuşma bitti, Gemini'ye hemen bildir
+            else:
+                self._user_speaking = False                                                 # ("end",): konuşma bitti, Gemini'ye hemen bildir
                 self._t_user_end = time.monotonic()
                 self.brain.send_audio_end()
 
@@ -376,15 +385,25 @@ class Core:
         if rival:
             asyncio.get_running_loop().create_task(self._interject(rival, self.active, self._last_user, self._last_ai))
 
+    def _interject_still_valid(self, token: int) -> bool:
+        """Kullanıcı konuşmaya başladıysa ya da Live cevap veriyorsa araya girme artık anlamsız: vazgeç."""
+        return self._turn_seq == token and not self._user_speaking and not self._turn_audio and not self._arena
+
     async def _interject(self, rival: str, active: str, user: str, ai: str) -> None:
-        self._interjecting = True
+        """Üretim (metin + TTS) sırasında ana konuşma HİÇ engellenmez; yalnızca ses çalarken mikrofon durur.
+        Her adımda kısa zaman aşımı vardır ve kullanıcı konuşmaya başlarsa iş bırakılır."""
+        token = self._turn_seq
         try:
-            text = await self.aux.interject_text(rival, active, user, ai)
-            if not text:
+            text = await asyncio.wait_for(self.aux.interject_text(rival, active, user, ai), INTERJECT_TEXT_TIMEOUT)
+            if not text or not self._interject_still_valid(token):
                 return
-            pcm = await self.aux.tts(rival, text)
+            pcm = await asyncio.wait_for(self.aux.tts(rival, text), INTERJECT_TTS_TIMEOUT)
+            if not self._interject_still_valid(token) or self.speaker.busy:
+                return
             intensity = float((settings.get("fx_intensity") or {}).get(rival, 1.0))
             pcm = voicefx.render(pcm, chips.get(rival).fx, intensity)
+            self._interjecting = True                              # yalnızca çalma süresince
+            self.gate.reset()
             self.emit("line", {"who": rival, "kind": "interject", "text": text, "final": True})
             self.history.append((rival, text))
             self._set_status("speaking", rival)
@@ -396,11 +415,12 @@ class Core:
             if rivalry.wants_retort() and self.brain:
                 self.brain.send_text(f'(Sistem notu: {chips.get(rival).name} araya girip şunu dedi: "{text}". '
                                      "Karakterine uygun tek kısa cümleyle karşılık ver ve işe dön.)")
-        except (AuxError, asyncio.TimeoutError, Exception) as exc:   # araya girme asla akışı bozmaz
+        except Exception as exc:                                    # araya girme asla akışı bozmaz
             log("araya girme atlandı", repr(exc)[:160])
         finally:
             self._interjecting = False
-            self._set_status("listening")
+            if self.status == "speaking":
+                self._set_status("listening")
 
     # ------------------------------------------------------------------ arena (§4.2)
     def start_arena(self, a: str, b: str, topic: str) -> None:
