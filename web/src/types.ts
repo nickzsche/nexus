@@ -58,7 +58,7 @@ export interface Telemetry {
   reconnects: number;
   fps: number;
   rtt: number | null;            // ağ gidiş-dönüş (ms)
-  battery: { level: number; charging: boolean } | null;
+  battery: { level: number /* 0–1 */; charging: boolean } | null;
   // yalnızca masaüstü (Electron) köprüsü doldurur:
   cpu?: number; ram?: number; disk?: number; netDown?: number; netUp?: number;
 }
