@@ -8,7 +8,8 @@ import time
 
 from . import paths
 
-_KEY = re.compile(r"AIza[0-9A-Za-z_\-]{20,}")
+# Google anahtar biçimleri: eski "AIza…" ve yeni "AQ.…"; ayrıca key=/x-goog-api-key başlığı değerleri.
+_KEY = re.compile(r"(?:AIza[0-9A-Za-z_\-]{20,}|AQ\.[0-9A-Za-z_\-]{20,}|(?<=key=)[0-9A-Za-z_.\-]{20,})")
 _LOCK = threading.Lock()
 _MAX = 1_000_000  # bayt; aşınca eski dosya .1'e taşınır
 

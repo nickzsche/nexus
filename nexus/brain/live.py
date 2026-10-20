@@ -6,6 +6,7 @@ oturum sürdürme tutamacı (handle) ile sessizce yeniden bağlanılır. Tüm ge
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any, Awaitable, Callable
 
 from .. import chips, prompts, settings
@@ -16,6 +17,8 @@ from .aux import voice_for
 RETRYABLE_MODEL = ("not found", "not supported", "permission", "quota", "404", "403", "429", "unsupported", "unavailable")
 FATAL_KEY = ("api key not valid", "api_key_invalid", "invalid api key", "unauthenticated", "401")
 BACKOFF = (1, 2, 4, 8, 15)
+BAD_MODEL_TTL = 600.0                    # kota/yok diyen model bu kadar süre atlanır (her çip değişiminde yeniden denenmesin)
+_BAD_MODELS: dict[str, float] = {}
 
 ToolRunner = Callable[[str, dict], dict]        # (name, args) -> {"result"|"error": ...}; iş parçacığında çalışır
 
@@ -139,7 +142,10 @@ class LiveSession:
     async def _session_once(self) -> None:
         """Modelleri sırayla dener; biri 'yok / desteklenmiyor / yetki / kota' derse sıradakine geçer."""
         last: Exception | None = None
-        for model in settings.get("live_models"):
+        now = time.monotonic()
+        models = list(settings.get("live_models"))
+        usable = [m for m in models if _BAD_MODELS.get(m, 0) < now] or models      # hepsi kötüyse hepsini dene
+        for model in usable:
             try:
                 async with self._connector(model, self._config()) as session:
                     self.model = model
@@ -152,6 +158,7 @@ class LiveSession:
             except Exception as exc:
                 last = exc
                 if any(k in str(exc).lower() for k in RETRYABLE_MODEL) and not self.handle:
+                    _BAD_MODELS[model] = time.monotonic() + BAD_MODEL_TTL
                     log("live modeli reddetti, sıradaki deneniyor", model, repr(exc)[:120])
                     continue
                 raise

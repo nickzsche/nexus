@@ -26,3 +26,11 @@ def test_limit_keeps_latest():
     for i in range(memory.MAX_ITEMS + 10):
         memory.add(f"kayıt {i}")
     assert len(memory.items()) == memory.MAX_ITEMS and memory.items()[-1] == f"kayıt {memory.MAX_ITEMS + 9}"
+
+
+def test_log_masks_all_google_key_formats():
+    from nexus import log
+    old = "AIza" + "x" * 35
+    new = "AQ." + "Ab8" + "z" * 40
+    out = log.mask(f"a {old} b {new} c ?key={'q' * 30}")
+    assert old not in out and new not in out and "q" * 30 not in out
