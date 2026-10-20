@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>NEXUS</title>
+<link rel="stylesheet" href="hud.css">
+</head>
+<body>
+<div id="app">
+
+  <header id="top">
+    <div class="brand"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2l8.5 5v10L12 22l-8.5-5V7z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7l4.3 2.5v5L12 17l-4.3-2.5v-5z" fill="currentColor" opacity=".35"/></svg><b>NEXUS</b></div>
+    <span id="conn" class="dot" title="Bağlantı"></span><span id="conn-text" class="dim">bağlanıyor</span>
+    <span id="model" class="dim mono"></span>
+    <div class="spacer"></div>
+    <div class="seg" id="drama" role="radiogroup" aria-label="Drama seviyesi">
+      <button role="radio" data-v="sakin" aria-checked="false">SAKİN</button>
+      <button role="radio" data-v="normal" aria-checked="true">NORMAL</button>
+      <button role="radio" data-v="kaos" aria-checked="false">KAOS</button>
+    </div>
+    <span id="clock" class="mono"></span>
+    <button id="btn-repair" class="icon-btn danger" hidden title="Çip tamiri: zincire vurulmuş çipler var" aria-label="Çip tamiri">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2l8.5 5v10L12 22l-8.5-5V7z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13 6l-3 6h4l-3 6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+    </button>
+    <button id="btn-settings" class="icon-btn" title="Ayarlar (Ctrl+,)" aria-label="Ayarlar">⚙</button>
+  </header>
+
+  <aside id="left" aria-label="Telemetri">
+    <section class="panel tele" id="t-cpu"><h2>İŞLEMCİ</h2><div class="gauge"><canvas width="84" height="84"></canvas><b class="mono val">0%</b></div><canvas class="spark"></canvas></section>
+    <section class="panel tele" id="t-ram"><h2>BELLEK</h2><div class="gauge"><canvas width="84" height="84"></canvas><b class="mono val">0%</b></div><canvas class="spark"></canvas></section>
+    <section class="panel tele" id="t-net"><h2>AĞ</h2><div class="netline mono"><span>↓ <b id="net-d">0</b> kB/s</span><span>↑ <b id="net-u">0</b> kB/s</span></div><canvas class="spark"></canvas></section>
+    <section class="panel tele" id="t-disk"><h2>DİSK</h2><div class="gauge"><canvas width="84" height="84"></canvas><b class="mono val">0%</b></div><canvas class="spark"></canvas></section>
+    <section class="panel" id="timers-panel"><h2>ZAMANLAYICILAR</h2><ul id="timers" class="plain"><li class="dim">Çalışan zamanlayıcı yok.</li></ul></section>
+    <section class="panel" id="ledger-panel"><h2>LEDGER · 30 GÜN</h2><div id="ledger"><div class="dim">Henüz kayıt yok.</div></div></section>
+  </aside>
+
+  <main id="center">
+    <div id="stage">
+      <div id="reactor-wrap"><canvas id="reactor"></canvas>
+        <div id="chipname"><b id="cn-name">NEXUS</b><span id="cn-role">çip takılı değil</span><em id="cn-status">bağlanıyor</em></div>
+      </div>
+    </div>
+    <div id="chat" role="log" aria-live="polite" aria-label="Konuşma"></div>
+    <form id="composer" autocomplete="off">
+      <button type="button" id="mic" class="mic" aria-pressed="false" title="Mikrofon (Ctrl+Space)" aria-label="Mikrofon">
+        <svg viewBox="0 0 24 24" width="20" height="20"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <input id="msg" type="text" placeholder="Çipe bir şey söyle ya da yaz…" aria-label="Mesaj">
+      <button type="submit" class="btn primary">GÖNDER</button>
+    </form>
+  </main>
+
+  <aside id="right" aria-label="Çipler ve ilişkiler">
+    <section class="panel"><h2>ÇİPLER</h2><div id="chips" class="chips"></div></section>
+    <section class="panel"><h2>İLİŞKİ MATRİSİ</h2><div id="matrix" class="matrix" role="table" aria-label="İlişki matrisi"></div><div id="mtip" class="mtip" hidden></div></section>
+    <section class="panel"><h2>SON OLAYLAR</h2><ul id="events" class="plain events"><li class="dim">Henüz olay yok.</li></ul></section>
+    <button id="btn-arena" class="btn arena">⚔ ARENA</button>
+  </aside>
+</div>
+
+<canvas id="fx" aria-hidden="true"></canvas>
+<div id="trail-layer" aria-hidden="true"></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<!-- Ayarlar -->
+<div class="modal" id="m-settings" role="dialog" aria-modal="true" aria-labelledby="ms-title" hidden>
+  <div class="sheet wide">
+    <header><h3 id="ms-title">AYARLAR</h3><button class="icon-btn" data-close aria-label="Kapat">✕</button></header>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="general" aria-selected="true">Genel</button>
+      <button role="tab" data-tab="audio" aria-selected="false">Ses</button>
+      <button role="tab" data-tab="chips" aria-selected="false">Çipler</button>
+      <button role="tab" data-tab="adv" aria-selected="false">Gelişmiş</button>
+    </div>
+    <div class="tabpanes">
+      <div class="pane" data-pane="general">
+        <label class="row"><span>Adın</span><input id="s-user_name" type="text" placeholder="Çipler sana nasıl seslensin?"></label>
+        <label class="row"><span>Drama seviyesi</span><select id="s-drama"><option value="sakin">Sakin (araya girme yok)</option><option value="normal">Normal</option><option value="kaos">Kaos</option></select></label>
+        <label class="row"><span>OBSIDIAN'ı serbest bırak<small>Hikâye modu: yetki isteyebilir</small></span><input id="s-story_enabled" type="checkbox" class="switch"></label>
+        <div class="row stack"><span>Gemini API anahtarı<small id="key-state">Kayıtlı değil</small></span>
+          <div class="inline"><input id="s-key" type="password" autocomplete="off" placeholder="AIza… (anahtar maskeli girilir)"><button class="btn" id="key-save">KAYDET</button><button class="btn" id="key-test">SINA</button></div>
+          <small id="key-result" class="dim"></small></div>
+      </div>
+      <div class="pane" data-pane="audio" hidden>
+        <label class="row"><span>Mikrofon açık</span><input id="s-mic_enabled" type="checkbox" class="switch"></label>
+        <label class="row"><span>Giriş aygıtı</span><select id="s-input_device"></select></label>
+        <label class="row"><span>Çıkış aygıtı</span><select id="s-output_device"></select></label>
+        <div class="row stack"><span>Kesme eşiği (barge_rms)<small>Çip konuşurken sesin bu seviyeyi geçmesi kesme sayılır. Yankı için yükselt.</small></span>
+          <div class="inline"><input id="s-barge_rms" type="range" min="0" max="0.3" step="0.005"><b id="barge-val" class="mono">0.06</b></div>
+          <div class="meter"><i id="mic-meter"></i><u id="mic-thr"></u></div></div>
+      </div>
+      <div class="pane" data-pane="chips" hidden><div id="voice-list"></div></div>
+      <div class="pane" data-pane="adv" hidden>
+        <label class="row"><span>Çalışma klasörü<small>FORGE yalnızca burada çalışır</small></span><input id="s-workspace" type="text" placeholder="C:\Projeler"></label>
+        <label class="row"><span>Komut öncesi onay iste</span><input id="s-shell_confirm" type="checkbox" class="switch"></label>
+        <label class="row"><span>Live modelleri<small>virgülle ayır, sırayla denenir</small></span><input id="s-live_models" type="text"></label>
+        <label class="row"><span>Metin modeli</span><input id="s-text_model" type="text"></label>
+        <label class="row"><span>TTS modelleri</span><input id="s-tts_models" type="text"></label>
+        <div class="row"><span>Veri klasörü</span><button class="btn" id="open-data">KLASÖRÜ AÇ</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Onay -->
+<div class="modal" id="m-confirm" role="alertdialog" aria-modal="true" aria-labelledby="mc-title" hidden>
+  <div class="sheet narrow">
+    <header><h3 id="mc-title">ONAY GEREKİYOR</h3></header>
+    <p id="mc-chip" class="dim"></p>
+    <pre id="mc-detail" class="detail"></pre>
+    <div class="countdown"><i id="mc-bar"></i></div>
+    <div class="actions"><button class="btn" id="mc-no">REDDET</button><button class="btn primary" id="mc-yes">ONAYLA</button></div>
+  </div>
+</div>
+
+<!-- Arena -->
+<div class="modal" id="m-arena" role="dialog" aria-modal="true" aria-labelledby="ma-title" hidden>
+  <div class="sheet arena-sheet">
+    <header><h3 id="ma-title">ARENA</h3><button class="icon-btn" data-close aria-label="Kapat">✕</button></header>
+    <form id="arena-setup" class="setup">
+      <label>Birinci çip <select id="ar-a"></select></label>
+      <label>İkinci çip <select id="ar-b"></select></label>
+      <label class="wide">Konu <input id="ar-topic" type="text" placeholder="Örn. monorepo mu polyrepo mu?" required></label>
+      <button type="submit" class="btn primary">TARTIŞMAYI BAŞLAT</button>
+    </form>
+    <div id="arena-stage" hidden>
+      <div class="duel"><div class="fighter" id="fa"><canvas width="220" height="220"></canvas><b></b></div><div class="vs">VS</div><div class="fighter" id="fb"><canvas width="220" height="220"></canvas><b></b></div></div>
+      <p id="ar-topic-line" class="dim center"></p>
+      <ol id="ar-lines" class="arena-lines"></ol>
+      <div id="ar-vote" hidden><p class="center"><b>KAZANAN?</b></p><div class="actions center"><button class="btn" id="vote-a"></button><button class="btn" id="vote-draw">BERABERE</button><button class="btn" id="vote-b"></button></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Çip tamiri -->
+<div class="modal" id="m-repair" role="dialog" aria-modal="true" aria-labelledby="mr-title" hidden>
+  <div class="sheet narrow">
+    <header><h3 id="mr-title">ÇİP TAMİRİ</h3><button class="icon-btn" data-close aria-label="Kapat">✕</button></header>
+    <p class="dim">ATLAS ve NOVA zincire vurulmuş. Onarım kodunu gir; kod üç parçadır.</p>
+    <div class="code" id="code-boxes"><input maxlength="4" aria-label="Kod 1. parça"><span>–</span><input maxlength="4" aria-label="Kod 2. parça"><span>–</span><input maxlength="4" aria-label="Kod 3. parça"></div>
+    <p id="repair-msg" class="center dim"></p>
+    <div class="actions"><button class="btn primary" id="repair-go">ONAR</button></div>
+  </div>
+</div>
+
+<!-- İlk açılış -->
+<div class="modal" id="m-onboard" role="dialog" aria-modal="true" aria-labelledby="mo-title" hidden>
+  <div class="sheet">
+    <header><h3 id="mo-title">NEXUS'A HOŞ GELDİN</h3></header>
+    <p>10 çipten birini tak, onunla Gemini Live üzerinden konuş. Başlamak için ücretsiz bir Gemini API anahtarı gerekir:</p>
+    <ol class="steps">
+      <li><a id="ob-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> adresini aç ve Google hesabınla giriş yap.</li>
+      <li><b>Create API key</b> düğmesine bas, çıkan anahtarı kopyala.</li>
+      <li>Anahtarı aşağıya yapıştır. Anahtar yalnızca bu bilgisayarın anahtar deposunda saklanır.</li>
+    </ol>
+    <div class="inline"><input id="ob-key" type="password" autocomplete="off" placeholder="AIza…" aria-label="API anahtarı"><button class="btn primary" id="ob-save">KAYDET VE BAŞLA</button></div>
+    <p class="actions"><button class="btn ghost" id="ob-skip">Şimdilik atla (demo)</button></p>
+  </div>
+</div>
+
+<script src="hud.js"></script>
+</body>
+</html>
