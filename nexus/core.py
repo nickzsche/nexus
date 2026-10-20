@@ -72,6 +72,7 @@ class Core:
         self._interjecting = False
         self._last_user = ""
         self._last_ai = ""
+        self._sent: dict[str, str] = {}              # açık HUD satırına şimdiye dek gönderilen metin
         self._mic_level = 0.0
         self._timer_totals: dict[int, float] = {}
         self._stop = threading.Event()
@@ -274,15 +275,22 @@ class Core:
         self.emit("error", {"message": msg, "fatal": fatal, "open_settings": fatal and "anahtar" in msg.lower()})
 
     def _on_line(self, who: str, text: str, final: bool) -> None:
+        """HUD kısmi parçaları satıra EKLER; bu yüzden Live'ın biriken metninden yalnızca yeni kısmı göndeririz."""
         user = who == "user"
+        kind = "user" if user else "ai"
         key = "user" if user else self.active
-        self.emit("line", {"who": key, "kind": "user" if user else "ai", "text": text, "final": final})
+        sent = self._sent.get(kind, "")
+        delta = text[len(sent):] if text.startswith(sent) else text
+        self.emit("line", {"who": key, "kind": kind, "text": delta, "final": final})
         if final:
+            self._sent.pop(kind, None)
             self.history.append((key, text))
             if user:
                 self._last_user = text
             else:
                 self._last_ai = text
+        else:
+            self._sent[kind] = text
 
     def _on_audio(self, data: bytes) -> None:
         if self._arena or self._interjecting or self._chain is None:
@@ -297,6 +305,9 @@ class Core:
         rivalry.note_spoke(self.active)
 
     def _on_interrupted(self) -> None:
+        if "ai" in self._sent:                                     # yarım kalan çip satırını kapat
+            self._sent.pop("ai")
+            self.emit("line", {"who": self.active, "kind": "ai", "text": "", "final": True})
         self.speaker.clear(self.active)
         self._turn_audio = False
 

@@ -78,3 +78,9 @@ def test_partial_lines_merge(page):
 
 def test_no_console_errors(page):
     assert page.errors == []
+
+
+def test_mock_telemetry_is_silent_when_real_bridge_exists():
+    """Gerçek pywebview köprüsü varken sahte telemetri sayacı çalışmamalı (iki kaynak = testere dişi grafik)."""
+    src = (pathlib.Path(__file__).resolve().parent.parent / "nexus" / "hud" / "web" / "hud.js").read_text(encoding="utf-8")
+    assert "setInterval(() => { if (real()) return;" in src

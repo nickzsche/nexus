@@ -476,7 +476,7 @@ const MOCK = (() => {
   const emit = (e, p) => setTimeout(() => NX.on(e, p), 0), later = (ms, f) => setTimeout(f, ms);
   const say = (who, kind, text, done) => { const words = text.split(' '); let i = 0; emit('status', { status:'speaking', chip:who }); (function nx() { if (i < words.length) { emit('line', { who, kind, text:(i ? ' ' : '') + words[i++], final:false }); later(110, nx); } else { emit('line', { who, kind, text:'', final:true }); done && done(); } })(); };
   let tele = { cpu:22, ram:48, disk:61, nd:120, nu:30 };
-  setInterval(() => { const w = (v, a, b, s) => clamp(v + (Math.random() - .5) * s, a, b); tele = { cpu:w(tele.cpu, 3, 97, 14), ram:w(tele.ram, 30, 90, 3), disk:w(tele.disk, 50, 80, .4), nd:w(tele.nd, 0, 900, 120), nu:w(tele.nu, 0, 300, 50) };
+  setInterval(() => { if (real()) return; const w = (v, a, b, s) => clamp(v + (Math.random() - .5) * s, a, b); tele = { cpu:w(tele.cpu, 3, 97, 14), ram:w(tele.ram, 30, 90, 3), disk:w(tele.disk, 50, 80, .4), nd:w(tele.nd, 0, 900, 120), nu:w(tele.nu, 0, 300, 50) };
     const talking = st.speaking; NX.on('telemetry', { cpu:tele.cpu, ram:tele.ram, disk:tele.disk, net_down:tele.nd, net_up:tele.nu, mic:st.mic ? .02 + Math.random() * .12 : .004, spk:talking ? .2 + Math.random() * .6 : 0, speaker:talking ? st.active : null }); }, 1000);
   const api = {
     state() { return { roster, active:st.active, matrix:matrix(), events, story:st.story, settings:{ ...settings }, has_key:st.hasKey, model:'gemini-3.8-live', version:'1.0.0',

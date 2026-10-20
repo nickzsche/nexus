@@ -132,3 +132,24 @@ def test_telemetry_has_hud_keys(core):
     until(lambda: any(e == "telemetry" for e, _ in core.events), 4)
     t = [p for e, p in core.events if e == "telemetry"][-1]
     assert {"cpu", "ram", "disk", "net_down", "net_up", "mic", "spk", "speaker"} <= set(t)
+
+
+def test_partial_lines_send_only_new_text(core):
+    """HUD parçaları satıra ekler: biriken metin değil, yalnızca yeni kısım gitmeli (tekrarlayan yazı hatası)."""
+    core.events.clear()
+    for text, final in [("Merhaba", False), ("Merhaba şef.", False), ("Merhaba şef. Nasılsın?", False), ("Merhaba şef. Nasılsın?", True)]:
+        core._on_line("ai", text, final)
+    got = [(p["text"], p["final"]) for e, p in core.events if e == "line"]
+    assert got == [("Merhaba", False), (" şef.", False), (" Nasılsın?", False), ("", True)]
+    assert "".join(t for t, _ in got) == "Merhaba şef. Nasılsın?"
+    assert core.history[-1][1] == "Merhaba şef. Nasılsın?"
+
+
+def test_interrupt_closes_open_ai_line(core):
+    core.events.clear()
+    core._on_line("ai", "Başlıyorum", False)
+    core._on_interrupted()
+    core._on_line("ai", "Tamam", False)
+    core._on_line("ai", "Tamam", True)
+    got = [(p["text"], p["final"]) for e, p in core.events if e == "line"]
+    assert got == [("Başlıyorum", False), ("", True), ("Tamam", False), ("", True)]
